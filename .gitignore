@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+build/
+dist/
+
+# Local credentials, state and captures
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.log
+profiles.json
+sessions.json
+.local/
+docs/desktop*.png
+docs/redesign*.png
