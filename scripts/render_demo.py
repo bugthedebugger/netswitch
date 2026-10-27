@@ -25,7 +25,8 @@ PROFILE = {'interface': 'wlan0', 'fallback': 'eth0', 'automatic': True,
            'command': ['/usr/bin/firefox', '--new-instance'], 'app': BROWSER}
 SESSION = {'id': 'demo-browser', 'pid': 60000, 'name': 'Firefox', 'interface': 'wlan0',
            'fallback': 'eth0', 'active': 'wlan0', 'automatic': True,
-           'traffic': {'routed': {'bytes': 2097152, 'packets': 1000}, 'blocked': {'packets': 0}}}
+           'traffic': {'routed': {'bytes': 2097152, 'packets': 1000},
+                       'received': {'bytes': 16777216, 'packets': 12000}, 'blocked': {'packets': 0}}}
 
 def response(data):
     if data['action'] == 'status':

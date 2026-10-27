@@ -1,4 +1,4 @@
-"""Read-only live routing view; counters are outbound, never invented downloads."""
+"""Read-only live routing view with per-session sent and received counters."""
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (QAbstractItemView, QGridLayout, QHeaderView, QHBoxLayout,
@@ -43,8 +43,8 @@ class UsagePage(QScrollArea):
         empty_layout.addWidget(self.empty)
         empty_layout.addStretch()
         layout.addWidget(self.empty_panel)
-        self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels(['App', 'Using now', 'Preferred', 'Backup', 'Sent', 'Routing'])
+        self.table = QTableWidget(0, 7)
+        self.table.setHorizontalHeaderLabels(['App', 'Using now', 'Preferred', 'Backup', 'Sent', 'Received', 'Routing'])
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -55,8 +55,8 @@ class UsagePage(QScrollArea):
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         layout.addWidget(self.table)
-        note = label('Outgoing traffic only · Updates every 3 seconds · Other apps aren’t individually tracked', 'muted')
-        note.setToolTip('Sent counters start again when routing rules change. They are not a billing total and do not include downloads.')
+        note = label('Sent and received traffic · Updates every 3 seconds · Other apps aren’t individually tracked', 'muted')
+        note.setToolTip('Counters reset when routing rules change and exclude localhost traffic. They are not a billing total. Received traffic counts TCP/UDP packets matched to app sockets. — means the routing service needs updating or the counter is unavailable.')
         layout.addWidget(note)
         layout.addStretch()
 
@@ -75,6 +75,8 @@ class UsagePage(QScrollArea):
         for index, name in enumerate(names):
             active = [s for s in sessions if s.get('active') == name]
             sent = sum(s.get('traffic', {}).get('routed', {}).get('bytes', 0) for s in active)
+            received = [s.get('traffic', {}).get('received') for s in active]
+            received_text = bytes_text(sum(c['bytes'] for c in received)) if all(c is not None for c in received) else '—'
             card, card_layout = panel()
             header = QHBoxLayout()
             header.addWidget(label(friendly(name), 'heading'), 1)
@@ -87,8 +89,11 @@ class UsagePage(QScrollArea):
             metric = QHBoxLayout()
             metric.addWidget(label(str(len(active)), 'metric'))
             metric.addWidget(label(f'active {"app" if len(active) == 1 else "apps"}', 'muted'), 1)
-            metric.addWidget(label(f'{bytes_text(sent)} sent', 'muted'))
             card_layout.addLayout(metric)
+            totals = QHBoxLayout()
+            totals.addWidget(label(f'{bytes_text(sent)} sent', 'muted'), 1)
+            totals.addWidget(label(f'{received_text} received', 'muted'))
+            card_layout.addLayout(totals)
             self.connections.addWidget(card, index // 2, index % 2)
         self.count.setText(f'{len(sessions)} active')
         self.empty.setVisible(not sessions)
@@ -104,6 +109,7 @@ class UsagePage(QScrollArea):
             values = [title_for(session), friendly(session['active']) if session.get('active') else 'Waiting',
                       friendly(session.get('interface')), friendly(session.get('fallback')),
                       bytes_text(traffic.get('routed', {}).get('bytes', 0)),
+                      bytes_text(traffic['received']['bytes']) if traffic.get('received') is not None else '—',
                       'Automatic' if session.get('automatic') else 'Net Switch launch']
             for column, text in enumerate(values):
                 item = QTableWidgetItem(text)

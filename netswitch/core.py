@@ -109,6 +109,11 @@ def nft_rules(identifier, mark, active):
         output += f'  meta mark {mark} return\n'
     output += f'''  meta mark {mark} counter reject
  }}
+ chain received {{
+  type filter hook input priority 300; policy accept;
+  iifname "lo" return
+  socket cgroupv2 level 2 "netswitch/{identifier}" counter
+ }}
  chain nat {{
   type nat hook postrouting priority srcnat; policy accept;
 '''

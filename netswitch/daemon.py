@@ -205,6 +205,7 @@ class Service:
                                 counter = expression['counter']
                                 counters[rule['chain']] = counter
                 public['traffic'] = {'routed': counters.get('route', {'packets': 0, 'bytes': 0}),
+                                     'received': counters.get('received'),
                                      'blocked': counters.get('guard', {'packets': 0, 'bytes': 0})}
                 sessions.append(public)
             return sessions

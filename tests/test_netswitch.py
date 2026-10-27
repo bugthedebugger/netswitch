@@ -25,6 +25,32 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(len(commands), 2)
         self.assertTrue(all('unreachable' in c for c in commands))
 
+    def test_received_counter_is_read_only_and_scoped_to_app_sockets(self):
+        rules = core.nft_rules('s42000', 123, 'wlan0')
+        incoming = rules.split(' chain received {', 1)[1].split(' chain nat {', 1)[0]
+        self.assertIn('type filter hook input priority 300; policy accept;', incoming)
+        self.assertIn('iifname "lo" return', incoming)
+        self.assertIn('socket cgroupv2 level 2 "netswitch/s42000" counter', incoming)
+        self.assertNotIn('mark set', incoming)
+        self.assertNotIn('reject', incoming)
+
+    def test_status_reports_received_and_handles_missing_counters(self):
+        from types import SimpleNamespace
+        service = Service.__new__(Service)
+        service.sessions = {'s42000': {'id': 's42000', 'uid': 1000},
+                            's42001': {'id': 's42001', 'uid': 1001}}
+        counters = {'nftables': [{'rule': {'chain': chain, 'expr': [{'counter': counter}]}}
+                                for chain, counter in [('route', {'bytes': 500, 'packets': 5}),
+                                                       ('received', {'bytes': 8000, 'packets': 8})]]}
+        with patch('netswitch.daemon.execute', return_value=SimpleNamespace(returncode=0, stdout=json.dumps(counters))) as execute:
+            result = service.handle(1000, 1, {'action': 'status'})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['traffic']['received'], {'bytes': 8000, 'packets': 8})
+        self.assertEqual(result[0]['traffic']['routed']['bytes'], 500)
+        execute.assert_called_once()
+        with patch('netswitch.daemon.execute', return_value=SimpleNamespace(returncode=1)):
+            self.assertIsNone(service.handle(1000, 1, {'action': 'status'})[0]['traffic']['received'])
+
     def test_ipv4_only_connection_has_terminal_ipv6_route(self):
         device = {'name': 'wlan0', 'routes': {'-4': {'gateway': '192.0.2.1'}}}
         commands = core.route_commands(42000, device)
